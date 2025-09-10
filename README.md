@@ -2,6 +2,8 @@
 
 A standalone web-based interface for browsing and running canvas-sketch projects from any folder.
 
+![](./screenshot.jpg)
+
 ## 🚀 Quick Start
 
 ```bash
