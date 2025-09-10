@@ -16,9 +16,6 @@ node canvas-sketch-server.js
 # Open directly in browser
 open index.html
 ```
-- Uses mock data for demonstration
-- Works offline
-- Pre-configured with your sketch list
 
 ### Option 2: Full Server (Recommended)
 ```bash
@@ -28,9 +25,6 @@ node canvas-sketch-server.js
 # Open browser to:
 # http://localhost:3335
 ```
-- Real filesystem scanning
-- Browse any sketches folder
-- Dynamic loading
 
 ## ✨ Features
 
