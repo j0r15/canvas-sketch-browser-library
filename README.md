@@ -5,7 +5,7 @@ A standalone web-based interface for browsing and running canvas-sketch projects
 ## 🚀 Quick Start
 
 ```bash
-# Open directly in browser
+# Start the server and open browser
 node canvas-sketch-server.js
 ``` 
 
@@ -21,10 +21,10 @@ open index.html
 ### Option 2: Full Server (Recommended)
 ```bash
 # Start the server
-node server.js
+node canvas-sketch-server.js
 
 # Open browser to:
-# http://localhost:3333
+# http://localhost:3335
 ```
 - Real filesystem scanning
 - Browse any sketches folder
@@ -58,7 +58,7 @@ node server.js
 sketch-library/
 ├── index.html          # Standalone version (mock data)
 ├── enhanced-index.html  # Server-powered version
-├── server.js           # Node.js server for filesystem access
+├── canvas-sketch-server.js  # Node.js server for filesystem access
 └── README.md           # This file
 ```
 
@@ -105,9 +105,9 @@ Edit the `value` in `enhanced-index.html`:
 Modify the CSS in the `<style>` section for custom themes.
 
 ### Server Port
-Change the `PORT` variable in `server.js`:
+Change the `PORT` variable in `canvas-sketch-server.js`:
 ```javascript
-const PORT = 3333; // Change this
+const PORT = 3335; // Change this
 ```
 
 ## 🌐 Browser Compatibility
@@ -136,8 +136,8 @@ Requires ES6+ features:
 - Ensure canvas-sketch dependencies are available
 
 ### Server Won't Start
-- Check if port 3333 is available
-- Try a different port in `server.js`
+- Check if port 3335 is available
+- Try a different port in `canvas-sketch-server.js`
 - Ensure Node.js is installed
 
 ## 🎯 Pro Tips
