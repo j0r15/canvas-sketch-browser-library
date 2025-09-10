@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Sketch CLI Browser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #0a0a0a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: #111111;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .sketch-count {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .search-box {
+            padding: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+            font-family: inherit;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #555;
+        }
+
+        .sketch-list {
+            padding: 10px 0;
+        }
+
+        .sketch-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #1a1a1a;
+            transition: background 0.2s;
+            font-size: 12px;
+        }
+
+        .sketch-item:hover {
+            background: #1a1a1a;
+        }
+
+        .sketch-item.active {
+            background: #333;
+            border-left: 3px solid #555;
+        }
+
+        .sketch-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        .sketch-path {
+            color: #666;
+            font-size: 10px;
+        }
+
+        .main-content {
+            flex: 1;
+            position: relative;
+            background: #000;
+        }
+
+        .iframe-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .sketch-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: rgba(50, 50, 50, 0.7);
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 20px;
+            font-size: 11px;
+            color: #666;
+            border-top: 1px solid #333;
+        }
+
+        .server-status {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            z-index: 100;
+        }
+
+        .server-status.running {
+            color: #51cf66;
+        }
+
+        .server-status.stopped {
+            color: #ff6b6b;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1>Canvas Sketch CLI Browser</h1>
+                <div class="sketch-count" id="sketchCount">Loading sketches...</div>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" class="search-input" placeholder="Search sketches..." id="searchInput">
+            </div>
+            
+            <div class="sketch-list" id="sketchList">
+                <div class="loading">Loading sketches...</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="server-status stopped" id="serverStatus">
+                Canvas Sketch CLI: Stopped
+            </div>
+            
+            <div class="controls">
+                <button class="btn" id="fullscreenBtn">Fullscreen</button>
+                <button class="btn" id="stopBtn">Stop Server</button>
+            </div>
+            
+            <div class="iframe-container">
+                <div class="loading" id="mainLoading">Select a sketch to view</div>
+                <iframe class="sketch-iframe" id="sketchFrame" style="display: none;"></iframe>
+            </div>
+            
+            <div class="status-bar" id="statusBar">
+                Ready - Select a sketch to run with canvas-sketch-cli
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class CanvasSketchBrowser {
+            constructor() {
+                this.sketches = [];
+                this.currentSketch = null;
+                this.filteredSketches = [];
+                this.currentPort = 9966;
+                this.serverRunning = false;
+                
+                this.initElements();
+                this.bindEvents();
+                this.loadSketches();
+            }
+            
+            initElements() {
+                this.sketchList = document.getElementById('sketchList');
+                this.sketchFrame = document.getElementById('sketchFrame');
+                this.searchInput = document.getElementById('searchInput');
+                this.sketchCount = document.getElementById('sketchCount');
+                this.statusBar = document.getElementById('statusBar');
+                this.mainLoading = document.getElementById('mainLoading');
+                this.fullscreenBtn = document.getElementById('fullscreenBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.serverStatus = document.getElementById('serverStatus');
+            }
+            
+            bindEvents() {
+                this.searchInput.addEventListener('input', (e) => {
+                    this.filterSketches(e.target.value);
+                });
+                
+                this.fullscreenBtn.addEventListener('click', () => {
+                    if (this.sketchFrame.style.display !== 'none') {
+                        this.sketchFrame.requestFullscreen();
+                    }
+                });
+                
+                this.stopBtn.addEventListener('click', () => {
+                    this.stopServer();
+                });
+            }
+            
+            async loadSketches() {
+                try {
+                    const response = await fetch('/api/scan?path=../canvas-sketch-projects');
+                    const data = await response.json();
+                    
+                    this.sketches = data;
+                    this.filteredSketches = [...this.sketches];
+                    this.renderSketchList();
+                    this.updateSketchCount();
+                    this.updateStatus('Ready - Select a sketch to run');
+                    
+                } catch (error) {
+                    // Fallback to static list if API not available
+                    this.loadStaticSketches();
+                }
+            }
+            
+            loadStaticSketches() {
+                const sketchFiles = [
+                    'generative-arcs-scan-box1-infinite.js',
+                    'generative-arcs-scan-box1-infinite-subtle.js', 
+                    'generative-arcs-scan-box1.js',
+                    'canvas-10-print-rug-pattern.js',
+                    'canvas-10-print.js',
+                    'cyberpunk-tattoo-with-grain.js',
+                    'noise-glyphs.js',
+                    'video-glyphs-demo-festival.js',
+                    'sketch-04-pattern-color.js',
+                    'dus-privacy-01.js',
+                    'avoidcode-banner.js'
+                    // Add more as needed
+                ];
+                
+                this.sketches = sketchFiles.map(file => ({
+                    name: this.formatSketchName(file),
+                    filename: file,
+                    path: file
+                }));
+                
+                this.filteredSketches = [...this.sketches];
+                this.renderSketchList();
+                this.updateSketchCount();
+                this.updateStatus('Ready - Select a sketch to run');
+            }
+            
+            formatSketchName(filename) {
+                return filename
+                    .replace('.js', '')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+            }
+            
+            filterSketches(query) {
+                const lowerQuery = query.toLowerCase();
+                this.filteredSketches = this.sketches.filter(sketch => 
+                    sketch.name.toLowerCase().includes(lowerQuery) ||
+                    sketch.filename.toLowerCase().includes(lowerQuery)
+                );
+                this.renderSketchList();
+                this.updateSketchCount();
+            }
+            
+            renderSketchList() {
+                if (this.filteredSketches.length === 0) {
+                    this.sketchList.innerHTML = '<div class="loading">No sketches found</div>';
+                    return;
+                }
+                
+                this.sketchList.innerHTML = this.filteredSketches
+                    .map(sketch => 
+                        `<div class="sketch-item" data-filename="${sketch.filename}">
+                            <div class="sketch-name">${sketch.name}</div>
+                            <div class="sketch-path">${sketch.filename}</div>
+                        </div>`
+                    ).join('');
+                
+                // Bind click events
+                this.sketchList.querySelectorAll('.sketch-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const filename = item.dataset.filename;
+                        this.runSketch(filename);
+                        this.setActiveSketch(item);
+                    });
+                });
+            }
+            
+            setActiveSketch(element) {
+                this.sketchList.querySelectorAll('.sketch-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                element.classList.add('active');
+            }
+            
+            async runSketch(filename) {
+                this.updateStatus(`Starting canvas-sketch-cli for ${filename}...`);
+                this.mainLoading.style.display = 'block';
+                this.sketchFrame.style.display = 'none';
+                
+                try {
+                    // Stop any existing server first
+                    await this.stopServer();
+                    
+                    // Start new canvas-sketch-cli server
+                    const response = await fetch('/api/run-sketch', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            filename: filename,
+                            port: this.currentPort 
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.currentPort = result.port;
+                        
+                        // Wait a moment for server to start
+                        setTimeout(() => {
+                            const url = `http://localhost:${this.currentPort}`;
+                            this.sketchFrame.src = url;
+                            this.sketchFrame.style.display = 'block';
+                            this.mainLoading.style.display = 'none';
+                            this.serverRunning = true;
+                            this.updateServerStatus();
+                            this.updateStatus(`Running: ${filename} on port ${this.currentPort}`);
+                        }, 2000);
+                    } else {
+                        throw new Error('Failed to start canvas-sketch-cli');
+                    }
+                    
+                } catch (error) {
+                    this.updateStatus(`Error: ${error.message}`);
+                    this.mainLoading.textContent = `Error: ${error.message}`;
+                }
+                
+                this.currentSketch = filename;
+            }
+            
+            async stopServer() {
+                try {
+                    await fetch('/api/stop-sketch', { method: 'POST' });
+                    this.serverRunning = false;
+                    this.updateServerStatus();
+                    this.sketchFrame.style.display = 'none';
+                    this.mainLoading.style.display = 'block';
+                    this.mainLoading.textContent = 'Select a sketch to view';
+                    this.updateStatus('Server stopped');
+                } catch (error) {
+                    console.error('Error stopping server:', error);
+                }
+            }
+            
+            updateServerStatus() {
+                if (this.serverRunning) {
+                    this.serverStatus.textContent = `Canvas Sketch CLI: Running (Port ${this.currentPort})`;
+                    this.serverStatus.className = 'server-status running';
+                } else {
+                    this.serverStatus.textContent = 'Canvas Sketch CLI: Stopped';
+                    this.serverStatus.className = 'server-status stopped';
+                }
+            }
+            
+            updateSketchCount() {
+                const total = this.sketches.length;
+                const filtered = this.filteredSketches.length;
+                this.sketchCount.textContent = filtered === total ? 
+                    `${total} sketches` : 
+                    `${filtered} of ${total} sketches`;
+            }
+            
+            updateStatus(message) {
+                this.statusBar.textContent = message;
+            }
+        }
+        
+        // Initialize the browser when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new CanvasSketchBrowser();
+        });
+    </script>
+</body>
+</html>

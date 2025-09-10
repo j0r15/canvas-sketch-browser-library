@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Sketch Browser - With Module Support</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #0a0a0a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: #111111;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .sketch-count {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .search-box {
+            padding: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+            font-family: inherit;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #555;
+        }
+
+        .sketch-list {
+            padding: 10px 0;
+        }
+
+        .sketch-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #1a1a1a;
+            transition: background 0.2s;
+            font-size: 12px;
+        }
+
+        .sketch-item:hover {
+            background: #1a1a1a;
+        }
+
+        .sketch-item.active {
+            background: #333;
+            border-left: 3px solid #555;
+        }
+
+        .sketch-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        .sketch-path {
+            color: #666;
+            font-size: 10px;
+        }
+
+        .main-content {
+            flex: 1;
+            position: relative;
+            background: #000;
+        }
+
+        .iframe-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .sketch-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: rgba(50, 50, 50, 0.7);
+        }
+
+        .status-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 20px;
+            font-size: 11px;
+            color: #666;
+            border-top: 1px solid #333;
+        }
+
+        .no-sketches {
+            padding: 40px 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .info-box {
+            padding: 15px 20px;
+            background: rgba(74, 144, 226, 0.1);
+            border-left: 3px solid #4a90e2;
+            margin: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #4a90e2;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1>Canvas Sketch Browser</h1>
+                <div class="sketch-count" id="sketchCount">Ready</div>
+            </div>
+            
+            <div class="info-box">
+                ⚠️ Your sketches use Node.js modules (require). Use the server version for full compatibility:
+                <br><br>
+                <code>node server.js</code>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" class="search-input" placeholder="Search sketches..." id="searchInput">
+            </div>
+            
+            <div class="sketch-list" id="sketchList">
+                <div class="loading">Loading sketches...</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="controls">
+                <button class="btn" id="serverBtn">Start Server Guide</button>
+                <button class="btn" id="fullscreenBtn">Fullscreen</button>
+            </div>
+            
+            <div class="iframe-container">
+                <div class="loading" id="mainLoading">
+                    <div style="text-align: center; color: #666;">
+                        <h3>Canvas Sketch Browser</h3>
+                        <br>
+                        <p>Your sketches use <code>require()</code> which needs a server.</p>
+                        <br>
+                        <p><strong>To run sketches:</strong></p>
+                        <p>1. Open terminal in sketch-library folder</p>
+                        <p>2. Run: <code style="color: #4a90e2;">node server.js</code></p>
+                        <p>3. Open: <code style="color: #4a90e2;">http://localhost:3333</code></p>
+                        <br>
+                        <p>Or select a sketch to see the details →</p>
+                    </div>
+                </div>
+                <iframe class="sketch-iframe" id="sketchFrame" style="display: none;"></iframe>
+            </div>
+            
+            <div class="status-bar" id="statusBar">
+                Server needed - Your sketches use Node.js modules
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class SketchBrowser {
+            constructor() {
+                this.sketches = [];
+                this.currentSketch = null;
+                this.filteredSketches = [];
+                
+                this.initElements();
+                this.bindEvents();
+                this.loadSketches();
+            }
+            
+            initElements() {
+                this.sketchList = document.getElementById('sketchList');
+                this.sketchFrame = document.getElementById('sketchFrame');
+                this.searchInput = document.getElementById('searchInput');
+                this.sketchCount = document.getElementById('sketchCount');
+                this.statusBar = document.getElementById('statusBar');
+                this.mainLoading = document.getElementById('mainLoading');
+                this.fullscreenBtn = document.getElementById('fullscreenBtn');
+                this.serverBtn = document.getElementById('serverBtn');
+            }
+            
+            bindEvents() {
+                this.searchInput.addEventListener('input', (e) => {
+                    this.filterSketches(e.target.value);
+                });
+                
+                this.serverBtn.addEventListener('click', () => {
+                    this.showServerGuide();
+                });
+                
+                this.fullscreenBtn.addEventListener('click', () => {
+                    if (this.sketchFrame.style.display !== 'none') {
+                        this.sketchFrame.requestFullscreen();
+                    }
+                });
+            }
+            
+            showServerGuide() {
+                this.mainLoading.innerHTML = 
+                    '<div style="text-align: left; color: #fff; max-width: 600px;">' +
+                    '<h2 style="color: #4a90e2; margin-bottom: 20px;">🚀 Server Setup Guide</h2>' +
+                    '<div style="background: #222; padding: 20px; border-radius: 8px; margin: 20px 0;">' +
+                    '<h3 style="color: #51cf66; margin-bottom: 15px;">Quick Start:</h3>' +
+                    '<p style="margin: 10px 0;">1. Open terminal/command prompt</p>' +
+                    '<p style="margin: 10px 0;">2. Navigate to sketch-library folder:</p>' +
+                    '<code style="background: #333; padding: 8px; display: block; margin: 10px 0; border-radius: 4px;">cd /path/to/sketch-library</code>' +
+                    '<p style="margin: 10px 0;">3. Start the server:</p>' +
+                    '<code style="background: #333; padding: 8px; display: block; margin: 10px 0; border-radius: 4px;">node server.js</code>' +
+                    '<p style="margin: 10px 0;">4. Open browser to:</p>' +
+                    '<code style="background: #333; padding: 8px; display: block; margin: 10px 0; border-radius: 4px;">http://localhost:3333</code>' +
+                    '</div>' +
+                    '<div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px 0;">' +
+                    '<h4 style="color: #ff6b6b; margin-bottom: 10px;">Why do I need a server?</h4>' +
+                    '<p style="font-size: 12px; color: #ccc;">Your canvas-sketch files use <code>require()</code> to import modules like canvas-sketch and canvas-sketch-util. Browsers can\\'t handle Node.js modules directly - they need a server to transform and serve the files properly.</p>' +
+                    '</div>' +
+                    '</div>';
+                this.mainLoading.style.display = 'block';
+                this.sketchFrame.style.display = 'none';
+            }
+            
+            loadSketches() {
+                // Built-in sketch list
+                const sketchFiles = [
+                    'lines-noise-pattern.js', 'glyphs-portait.js', 'generative-arcs-scan-box-2-horizontal.js',
+                    'generative-arcs-5-scan.js', 'generative-arcs-4.js', 'generative-arcs-3.js',
+                    'generative-arcs-2.js', 'generative-arcs-1.js', 'dus-privacy-01-threejs.js',
+                    'cyberpunk-tattoo-with-grain.js', 'canvas-generative-silhouette.js', 'canvas-10-tattoo.js',
+                    'canvas-10-print.js', 'canvas-10-print-rug-pattern.js', 'noise-colors-iterate.js',
+                    'video-glyphs-skull.js', 'text-color-noise.js', 'test-p5.js', 'swirl.js',
+                    'sketch-wave-line.js', 'sketch-wave-line-static.js', 'sketch-audio.js',
+                    'sketch-05.js', 'sketch-04.js', 'sketch-04-pattern-webcam.js',
+                    'sketch-04-pattern-color-2-mouse.js', 'sketch-03.js', 'sketch-02.js',
+                    'sketch-01.js', 'wave-line.js', 'ascii-cube.js', 'p5-fingerprint.js',
+                    'glyphs-fingerprint.js', 'voidcode.js', 'sketch-04-pattern-fingerprint.js',
+                    'voidcode2.js', 'labyrinth-tattoo.js', 'cyberpunk-tattoo2.js', 'cyberpunk-tattoo.js',
+                    'text-torus.js', 'sketch-04-noise-eq-idea.js', 'rotating-cube.js',
+                    'noise-colors-iterate-sym.js', 'noise-colors-iterate-juggling.js', 'cyberpunk-tattoo3.js',
+                    'noise-arcs.js', 'noise-sea.js', 'lines-shadow.js', 'generative-arcs-4a.js',
+                    'fingerprint2.js', 'fingerprint3.js', 'fingerprint4.js', 'noise-tattoo.js',
+                    'fingerprint5.js', 'sketch-03-2.js', 'video-glyphs.js', 'noise-colors-iterate-circles.js',
+                    'noise-colors-iterate2.js', 'noise-blubs.js', 'noise-pulse.js', 'elips.js',
+                    'reactive-diffusion.js', 'video-glyphs-demo-festival.js', 'sketch-04-pattern-color.js',
+                    'sketch-04-pattern-color-2.js', 'sketch-04-pattern.js', 'sketch-04-pattern-text.js',
+                    'dus-privacy-02.js', 'dus-privacy-03-negative-noise-text.js', 'noise-glyphs.js',
+                    'dus-privacy-01.js', 'avoidcode-banner.js', 'generative-arcs-scan-box1.js',
+                    'generative-arcs-scan-box1-infinite-subtle.js', 'generative-arcs-scan-box1-infinite.js'
+                ];
+                
+                this.sketches = sketchFiles.map(file => ({
+                    name: this.formatSketchName(file),
+                    filename: file,
+                    path: '../canvas-sketch-projects/' + file
+                }));
+                
+                this.filteredSketches = [...this.sketches];
+                this.renderSketchList();
+                this.updateSketchCount();
+                this.updateStatus('Browse sketches - Server needed to run them');
+            }
+            
+            formatSketchName(filename) {
+                return filename
+                    .replace('.js', '')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+            }
+            
+            filterSketches(query) {
+                const lowerQuery = query.toLowerCase();
+                this.filteredSketches = this.sketches.filter(sketch => 
+                    sketch.name.toLowerCase().includes(lowerQuery) ||
+                    sketch.filename.toLowerCase().includes(lowerQuery)
+                );
+                this.renderSketchList();
+                this.updateSketchCount();
+            }
+            
+            renderSketchList() {
+                if (this.filteredSketches.length === 0) {
+                    this.sketchList.innerHTML = '<div class="no-sketches">No sketches found</div>';
+                    return;
+                }
+                
+                this.sketchList.innerHTML = this.filteredSketches
+                    .map(sketch => 
+                        '<div class="sketch-item" data-path="' + sketch.path + '" data-filename="' + sketch.filename + '">' +
+                            '<div class="sketch-name">' + sketch.name + '</div>' +
+                            '<div class="sketch-path">' + sketch.filename + '</div>' +
+                        '</div>'
+                    ).join('');
+                
+                // Bind click events
+                this.sketchList.querySelectorAll('.sketch-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const filename = item.dataset.filename;
+                        this.showSketchInfo(filename);
+                        this.setActiveSketch(item);
+                    });
+                });
+            }
+            
+            setActiveSketch(element) {
+                this.sketchList.querySelectorAll('.sketch-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                element.classList.add('active');
+            }
+            
+            showSketchInfo(filename) {
+                this.mainLoading.innerHTML = 
+                    '<div style="text-align: center; color: #fff;">' +
+                    '<h2 style="color: #4a90e2; margin-bottom: 20px;">' + this.formatSketchName(filename) + '</h2>' +
+                    '<div style="background: #222; padding: 20px; border-radius: 8px; margin: 20px; text-align: left;">' +
+                    '<p style="margin: 10px 0;"><strong>File:</strong> ' + filename + '</p>' +
+                    '<p style="margin: 10px 0;"><strong>Status:</strong> Needs server to run</p>' +
+                    '<p style="margin: 10px 0;"><strong>Reason:</strong> Uses Node.js modules (require)</p>' +
+                    '</div>' +
+                    '<div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin: 20px;">' +
+                    '<p style="color: #4a90e2; font-weight: bold;">To run this sketch:</p>' +
+                    '<p style="margin: 10px 0;">1. Start server: <code>node server.js</code></p>' +
+                    '<p style="margin: 10px 0;">2. Open: <code>http://localhost:3333</code></p>' +
+                    '</div>' +
+                    '</div>';
+                this.mainLoading.style.display = 'block';
+                this.sketchFrame.style.display = 'none';
+                this.updateStatus('Selected: ' + filename + ' - Server needed');
+            }
+            
+            updateSketchCount() {
+                const total = this.sketches.length;
+                const filtered = this.filteredSketches.length;
+                this.sketchCount.textContent = filtered === total ? 
+                    total + ' sketches' : 
+                    filtered + ' of ' + total + ' sketches';
+            }
+            
+            updateStatus(message) {
+                this.statusBar.textContent = message;
+            }
+        }
+        
+        // Initialize the browser when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new SketchBrowser();
+        });
+    </script>
+</body>
+</html>
